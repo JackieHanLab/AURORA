@@ -280,17 +280,18 @@ class Trainer:
         }
         x_kl = {
             k: D.kl_divergence(
-                z[k], prior
+                D.Normal(z[k].mean[:,:-1], z[k].stddev[:,:-1]), prior
             ).sum(dim=1).mean() / x[k].shape[1]
             for k in net.keys
         }
-        x_kl_ = x_kl
-        #x_kl_ = {
-        #    k: F.mse_loss(
-        #        z[k].mean[:,-1], xlbl[k].float(), reduction="none"
-        #    ).mean()
-        #    for k in net.keys
-        #}
+        
+        x_kl_ = {
+            k: F.mse_loss(
+                z[k].mean[:,-1], xlbl[k].float(), reduction="none"
+            ).mean()
+            for k in net.keys
+        }
+
         x_elbo = {
             k: x_nll[k] + self.lam_kl * (0.85 * x_kl[k] + 0.15 * x_kl_[k])
             for k in net.keys
