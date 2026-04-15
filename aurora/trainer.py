@@ -246,7 +246,7 @@ class Trainer:
             dsc_only: bool = False
     ) -> Mapping[str, torch.Tensor]:  # pragma: no cover
         net = self.net
-        x, xalt, xlbl, xflag = data
+        x, xalt, xlbl, xflag, pmsk = data
 
         z = {}
         for k in net.keys:
@@ -297,9 +297,56 @@ class Trainer:
             for k in net.keys
         }
         x_elbo_sum = sum(x_elbo[k] for k in net.keys)
-        
+        cross = True
+        if cross:
+            pmsk = pmsk.T
+            zsamp_stack = torch.stack([zsamp[k] for k in net.keys])
+            pmsk_stack = pmsk.unsqueeze(2).expand_as(zsamp_stack)
+            zsamp_mean = (zsamp_stack * pmsk_stack).sum(dim=0) / pmsk_stack.sum(dim=0)
+            lam_joint_cross: float = 0.08
+            lam_real_cross: float = 0.08
+            lam_cos: float = 0.02
+            if lam_joint_cross:
+                x_joint_cross_nll = {
+                    k: -net.z2x[k](
+                        zsamp_mean[m], usamp[getattr(net, f"{k}_idx")]
+                    ).log_prob(x[k][m]).mean()
+                    for k, m in zip(net.keys, pmsk) if m.sum() > 0
+                }
+                joint_cross_loss = sum(x_joint_cross_nll[k] for k in x_joint_cross_nll.keys())
+            else:
+                joint_cross_loss = torch.as_tensor(0.0, device=net.device)
+    
+            if lam_real_cross:
+                x_real_cross_nll = {}
+                for k in net.keys:
+                    xk_real_cross_nll = 0
+                    for k_target, m in zip(net.keys, pmsk):
+                        if (k != k_target) and m.sum() > 0:
+                            xk_real_cross_nll += -net.z2x[k_target](
+                                zsamp[k][m], usamp[getattr(net, f"{k_target}_idx")]
+                            ).log_prob(x[k_target][m]).mean()
+                    x_real_cross_nll[k] = xk_real_cross_nll
+                real_cross_loss = sum(x_real_cross_nll[k] for k in x_real_cross_nll.keys())
+            else:
+                real_cross_loss = torch.as_tensor(0.0, device=net.device)
+    
+            if lam_cos:
+                cos_loss = sum(
+                    1 - F.cosine_similarity(
+                        zsamp_stack[i, m], zsamp_mean[m]
+                    ).mean()
+                    for i, m in enumerate(pmsk) if m.sum() > 0
+                )
+            else:
+                cos_loss = torch.as_tensor(0.0, device=net.device)
+
         vae_loss = self.lam_data * x_elbo_sum \
             + self.lam_feature * len(net.keys) * f_kl 
+        if cross:
+            vae_loss = vae_loss + lam_joint_cross * joint_cross_loss \
+                + lam_real_cross * real_cross_loss \
+                + lam_cos * cos_loss
         gen_loss = vae_loss - dsc_loss
 
         losses = {
@@ -320,7 +367,7 @@ class Trainer:
         device = self.net.device
         keys = self.net.keys
         K = len(keys)
-        x, xalt, xlbl = data[0:K], data[K:2*K], data[2*K:3*K]
+        x, xalt, xlbl, pmsk = data[0:K], data[K:2*K], data[2*K:3*K], data[3*K]
         x = {
             k: x[i].to(device, non_blocking=True)
             for i, k in enumerate(keys)
@@ -339,7 +386,8 @@ class Trainer:
             ).expand(x[k].shape[0])
             for i, k in enumerate(keys)
         }
-        return x, xalt, xlbl, xflag
+        pmsk = pmsk.to(device, non_blocking=True)
+        return x, xalt, xlbl, xflag, pmsk
     
     def train_step(
             self, 
