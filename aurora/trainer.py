@@ -263,7 +263,7 @@ class Trainer:
             noise = D.Normal(0, z_cat.std(axis=0)).sample((z_cat.shape[0], ))
             z_cat = z_cat + (anneal * self.BURNIN_NOISE_EXAG) * noise
         dsc_loss = F.cross_entropy(net.du(z_cat), xflag_cat, reduction="none")
-        dsc_loss = dsc_loss.mean() * 0.1
+        dsc_loss = dsc_loss.mean() #* 0.1
         if dsc_only:
             return {"dsc_loss": dsc_loss}
         
