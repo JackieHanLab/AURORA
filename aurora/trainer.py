@@ -337,11 +337,7 @@ class Trainer:
             ).expand(x[k].shape[0])
             for i, k in enumerate(keys)
         }
-        xdwt = {
-            k: xdwt[i].to(device, non_blocking=True)
-            for i, k in enumerate(keys)
-        }
-        return x, xalt, xlbl, xdwt, xflag
+        return x, xalt, xlbl, xflag
     
     def train_step(
             self, 
