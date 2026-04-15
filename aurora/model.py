@@ -289,10 +289,11 @@ class AuroraModel(torch.nn.Module):
             mode="train"
         )
         batch_per_epoch = data.size * (1 - val_split) / data_batch_size
-        align_burnin = max(
-                    ceil(4000 / batch_per_epoch),
-                    8
-        )
+        if align_burnin == AUTO:
+            align_burnin = max(
+                        ceil(4000 / batch_per_epoch),
+                        8
+            )
         max_epochs = max(
                 ceil(4000 / batch_per_epoch),
                 48
