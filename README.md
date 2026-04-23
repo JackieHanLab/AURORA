@@ -109,4 +109,4 @@ contact@beyondagetec.com
 
 ## Cite AURORA:
 
-[Chen, J., et al. A Generative AI Framework Unifies Human Multi-omics to Model Aging, Metabolic Health and Intervention Response. Cell Metab. (2026)]
+[Chen, J., et al. A Generative AI Framework Unifies Human Multi-omics to Model Aging, Metabolic Health and Intervention Response. Cell Metab. (2026)](https://doi.org/10.1016/j.cmet.2026.03.014)
